@@ -352,16 +352,9 @@ let state = { user: null, polling: null, startedAt: null, executionId: null };
 
 // ═══════════════════════════════════════════════ INIT
 async function init() {
-  try {
-    const me = await api('/auth/me');
-    setUser(me);
-    showApp();
-    // hide Users tab for non-admins
-    if (!me.isAdmin) document.getElementById('nav-users-tab').classList.add('hidden');
-    await loadLatest();
-  } catch {
-    showLogin();
-  }
+  setUser({ email: 'user@local', isAdmin: true });
+  showApp();
+  await loadLatest();
 }
 
 // ═══════════════════════════════════════════════ VIEW SWITCH

@@ -46,16 +46,8 @@ app.use(session({
 }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const requireAuth  = (req, res, next) =>
-  req.session.userId ? next() : res.status(401).json({ error: 'Unauthorized' });
-
-const requireAdmin = (req, res, next) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Unauthorized' });
-  const users = readUsers();
-  const me = users.find(u => u.email === req.session.userId);
-  if (!me?.isAdmin) return res.status(403).json({ error: 'Admin only' });
-  next();
-};
+const requireAuth  = (req, res, next) => next(); // auth disabled
+const requireAdmin = (req, res, next) => next(); // auth disabled
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 app.post('/auth/login', (req, res) => {
@@ -73,9 +65,7 @@ app.post('/auth/logout', (req, res) => {
 });
 
 app.get('/auth/me', (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ error: 'Not authenticated' });
-  const user = readUsers().find(u => u.email === req.session.userId);
-  res.json({ email: req.session.userId, isAdmin: !!user?.isAdmin });
+  res.json({ email: 'user@local', isAdmin: true });
 });
 
 // ─── Admin: User management ───────────────────────────────────────────────────
