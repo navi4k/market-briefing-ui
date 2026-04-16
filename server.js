@@ -13,6 +13,11 @@ const WORKFLOW_ID = process.env.N8N_WORKFLOW_ID || 'TCTwgK1Apdy4oULj';
 const USERS_FILE  = path.join(__dirname, 'users.json');
 const CACHE_FILE  = path.join(__dirname, 'last_result.json');
 
+// Startup config check
+if (!N8N_KEY) console.warn('[warn] N8N_KEY is not set — n8n API calls will fail with 401');
+else          console.log(`[init] N8N_KEY loaded (${N8N_KEY.slice(0, 12)}...)`);
+console.log(`[init] N8N_URL=${N8N_URL}  WORKFLOW_ID=${WORKFLOW_ID}`);
+
 // ─── Bootstrap admin on first run ────────────────────────────────────────────
 function initUsers() {
   if (fs.existsSync(USERS_FILE)) return;
