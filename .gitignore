@@ -1,0 +1,22 @@
+﻿# Node modules
+node_modules/
+
+# Environment variables
+.env
+
+# Runtime data
+users.json
+last_result.json
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Build folders
+dist/
+build/

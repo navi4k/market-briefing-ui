@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Market Briefing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter','sans-serif'], mono: ['JetBrains Mono','monospace'] },
+          colors: {
+            surface: { DEFAULT:'#0d1117', card:'#161b22', border:'#21262d', muted:'#30363d' },
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { background: #0d1117; color: #e6edf3; font-family: 'Inter', sans-serif; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 3px; }
+
+    /* ── Glass card ── */
+    .card {
+      background: rgba(22, 27, 34, 0.8);
+      border: 1px solid #21262d;
+      border-radius: 12px;
+      backdrop-filter: blur(8px);
+    }
+    .card-glow:hover { border-color: #3b82f680; box-shadow: 0 0 20px rgba(59,130,246,0.08); }
+
+    /* ── Price pills ── */
+    .price-pill {
+      display: inline-flex; flex-direction: column; align-items: center;
+      padding: 6px 12px; border-radius: 8px; min-width: 72px;
+      font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 600;
+      transition: transform .15s; cursor: default; flex-shrink: 0;
+    }
+    .price-pill:hover { transform: translateY(-2px); }
+    .price-pill .pill-label { font-size: 9px; font-weight: 500; opacity: .7; margin-bottom: 1px; letter-spacing: .08em; text-transform: uppercase; }
+    .pill-pp   { background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.4); color: #22d3ee; }
+    .pill-res  { background: rgba(239,68,68,0.1);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+    .pill-sup  { background: rgba(34,197,94,0.1);  border: 1px solid rgba(34,197,94,0.3);  color: #86efac; }
+
+    /* ── Sentiment badge ── */
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+
+    /* ── Section header ── */
+    .section-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; opacity: .5; }
+
+    /* ── Table ── */
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table thead th { padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #7d8590; border-bottom: 1px solid #21262d; white-space: nowrap; }
+    .data-table tbody tr { border-bottom: 1px solid #161b22; transition: background .1s; }
+    .data-table tbody tr:hover { background: rgba(255,255,255,.03); }
+    .data-table tbody td { padding: 8px 12px; font-size: 13px; font-family: 'JetBrains Mono', monospace; color: #e6edf3; white-space: nowrap; }
+    .data-table tbody td:first-child { color: #7ee787; font-weight: 600; }
+
+    /* ── Animated spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes pulse-dot { 0%,100% { opacity:1; } 50% { opacity:.3; } }
+    .pulse-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+
+    /* ── Progress bar ── */
+    @keyframes progress-fill { from { width:0%; } }
+    .progress-bar { height: 3px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 2px; transition: width .5s ease; }
+
+    /* ── Fade in ── */
+    @keyframes fadeIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+    .fade-in { animation: fadeIn .4s ease forwards; }
+
+    /* ── Input ── */
+    .inp {
+      width: 100%; background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+      padding: 10px 14px; color: #e6edf3; font-size: 14px; outline: none; transition: border-color .2s;
+    }
+    .inp:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+    .inp::placeholder { color: #6e7681; }
+
+    /* ── Button ── */
+    .btn-primary {
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      color: white; font-weight: 600; font-size: 14px;
+      padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer;
+      transition: opacity .2s, transform .1s; display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary:hover:not(:disabled) { opacity: .9; }
+    .btn-primary:active:not(:disabled) { transform: scale(.98); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent; color: #8b949e; font-size: 13px; font-weight: 500;
+      padding: 7px 14px; border-radius: 8px; border: 1px solid #30363d; cursor: pointer; transition: all .2s;
+    }
+    .btn-ghost:hover { border-color: #58a6ff; color: #e6edf3; }
+
+    /* Bias text formatting */
+    .bias-text { font-size: 13px; line-height: 1.7; color: #cdd9e5; white-space: pre-wrap; }
+    .bias-text strong, .bias-text b { color: #e6edf3; }
+
+    /* Nav active */
+    .nav-link { padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; color: #8b949e; cursor: pointer; transition: all .15s; }
+    .nav-link:hover { color: #e6edf3; background: rgba(255,255,255,.06); }
+    .nav-link.active { color: #e6edf3; background: rgba(255,255,255,.08); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════ LOGIN -->
+<div id="view-login" class="min-h-screen flex items-center justify-center p-4" style="background: radial-gradient(ellipse at 60% 0%, rgba(59,130,246,.12) 0%, transparent 60%), radial-gradient(ellipse at 0% 100%, rgba(139,92,246,.08) 0%, transparent 50%), #0d1117;">
+  <div class="w-full max-w-sm fade-in">
+    <!-- Logo -->
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center gap-2 mb-3">
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background: linear-gradient(135deg,#2563eb,#7c3aed);">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        </div>
+        <span class="text-xl font-bold text-white tracking-tight">Market Briefing</span>
+      </div>
+      <p class="text-sm text-gray-500">NQ · ES Futures Intelligence</p>
+    </div>
+
+    <div class="card p-8">
+      <h2 class="text-lg font-semibold text-white mb-6">Sign in to continue</h2>
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1.5">Email address</label>
+          <input id="login-email" type="email" class="inp" placeholder="you@example.com" autocomplete="email" required />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-400 mb-1.5">Password</label>
+          <input id="login-pass" type="password" class="inp" placeholder="••••••••" autocomplete="current-password" required />
+        </div>
+        <div id="login-error" class="hidden text-red-400 text-sm bg-red-400/10 rounded-lg px-3 py-2 border border-red-400/20"></div>
+        <button type="submit" class="btn-primary w-full justify-center mt-2" id="login-btn">
+          <span>Sign in</span>
+        </button>
+      </form>
+    </div>
+    <p class="text-center text-xs text-gray-600 mt-6">Market Briefing · Private access only</p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════ DASHBOARD -->
+<div id="view-app" class="hidden min-h-screen flex-col">
+
+  <!-- ── Navbar ── -->
+  <header class="sticky top-0 z-40 border-b border-surface-border" style="background: rgba(13,17,23,.9); backdrop-filter: blur(12px);">
+    <div class="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+      <!-- Left: logo + symbol -->
+      <div class="flex items-center gap-3">
+        <div class="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0" style="background: linear-gradient(135deg,#2563eb,#7c3aed);">
+          <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+        </div>
+        <span class="font-bold text-white text-sm tracking-tight hidden sm:block">Market Briefing</span>
+        <div id="nav-symbol" class="hidden items-center gap-1.5 ml-1">
+          <span class="text-gray-600">·</span>
+          <span class="font-mono font-semibold text-cyan-400 text-sm" id="nav-symbol-text">NQ=F</span>
+          <span class="text-xs text-gray-600" id="nav-ran-at"></span>
+        </div>
+      </div>
+
+      <!-- Center: nav tabs -->
+      <nav class="flex items-center gap-1">
+        <button class="nav-link active" onclick="showTab('dashboard')">Dashboard</button>
+        <button class="nav-link" onclick="showTab('users')" id="nav-users-tab">Users</button>
+      </nav>
+
+      <!-- Right: run + user -->
+      <div class="flex items-center gap-2">
+        <button id="run-btn" onclick="runAnalysis()" class="btn-primary py-1.5 px-3 text-xs">
+          <svg id="run-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span id="run-label">Run Analysis</span>
+        </button>
+        <div class="relative" id="user-menu-wrapper">
+          <button onclick="toggleUserMenu()" class="btn-ghost py-1.5 px-2.5 flex items-center gap-1.5">
+            <div class="w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold" style="background: linear-gradient(135deg,#2563eb,#7c3aed);" id="user-avatar">U</div>
+            <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </button>
+          <div id="user-dropdown" class="hidden absolute right-0 mt-1 w-44 card shadow-xl py-1 z-50">
+            <div class="px-3 py-2 border-b border-gray-800">
+              <p class="text-xs text-gray-400 truncate" id="user-email-label"></p>
+            </div>
+            <button onclick="logout()" class="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-colors">Sign out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Main area ── -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6">
+
+    <!-- ── DASHBOARD TAB ── -->
+    <div id="tab-dashboard">
+
+      <!-- Loading / progress overlay -->
+      <div id="loading-panel" class="hidden card p-8 mb-6 fade-in">
+        <div class="flex items-center gap-4 mb-6">
+          <div class="w-10 h-10 rounded-full border-2 border-blue-500 border-t-transparent spinner"></div>
+          <div>
+            <p class="font-semibold text-white" id="loading-title">Running Analysis</p>
+            <p class="text-sm text-gray-400" id="loading-step">Initializing…</p>
+          </div>
+          <div class="ml-auto text-xs text-gray-500 font-mono" id="loading-elapsed">0s</div>
+        </div>
+        <div class="bg-gray-800 rounded-full overflow-hidden" style="height:3px;">
+          <div class="progress-bar" id="loading-bar" style="width:5%;"></div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-5" id="loading-steps">
+          <div class="step-item flex flex-col items-center gap-1.5 p-3 rounded-lg bg-white/3" data-step="0">
+            <div class="w-6 h-6 rounded-full border border-gray-700 flex items-center justify-center text-xs step-dot">1</div>
+            <span class="text-xs text-gray-500 text-center">Chart Data</span>
+          </div>
+          <div class="step-item flex flex-col items-center gap-1.5 p-3 rounded-lg" data-step="1">
+            <div class="w-6 h-6 rounded-full border border-gray-700 flex items-center justify-center text-xs step-dot">2</div>
+            <span class="text-xs text-gray-500 text-center">Market Data</span>
+          </div>
+          <div class="step-item flex flex-col items-center gap-1.5 p-3 rounded-lg" data-step="2">
+            <div class="w-6 h-6 rounded-full border border-gray-700 flex items-center justify-center text-xs step-dot">3</div>
+            <span class="text-xs text-gray-500 text-center">News</span>
+          </div>
+          <div class="step-item flex flex-col items-center gap-1.5 p-3 rounded-lg" data-step="3">
+            <div class="w-6 h-6 rounded-full border border-gray-700 flex items-center justify-center text-xs step-dot">4</div>
+            <span class="text-xs text-gray-500 text-center">AI Synthesis</span>
+          </div>
+          <div class="step-item flex flex-col items-center gap-1.5 p-3 rounded-lg" data-step="4">
+            <div class="w-6 h-6 rounded-full border border-gray-700 flex items-center justify-center text-xs step-dot">5</div>
+            <span class="text-xs text-gray-500 text-center">Building Report</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="empty-panel" class="flex flex-col items-center justify-center py-20 text-center">
+        <div class="w-16 h-16 rounded-2xl mb-5 flex items-center justify-center" style="background: rgba(59,130,246,.1); border: 1px solid rgba(59,130,246,.2);">
+          <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold text-white mb-2">No analysis yet</h3>
+        <p class="text-gray-500 text-sm mb-6 max-w-xs">Hit <strong class="text-white">Run Analysis</strong> to generate today's market briefing for NQ/ES futures.</p>
+        <button onclick="runAnalysis()" class="btn-primary">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          Run Analysis
+        </button>
+      </div>
+
+      <!-- Results -->
+      <div id="results-panel" class="hidden space-y-4 fade-in">
+
+        <!-- ── Price strip ── -->
+        <div class="card p-4">
+          <div class="flex items-center justify-between mb-3">
+            <p class="section-label">Key Levels Reference</p>
+            <span class="text-xs text-gray-500" id="price-count"></span>
+          </div>
+          <div class="flex gap-2 overflow-x-auto pb-1" id="price-strip"></div>
+        </div>
+
+        <!-- ── Bias ── -->
+        <div class="card p-5 border-l-4 border-l-emerald-500" id="bias-card">
+          <p class="section-label mb-3">Directional Bias</p>
+          <div class="bias-text" id="bias-content"></div>
+        </div>
+
+        <!-- ── Zones row ── -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="card p-5 border-l-4 border-l-red-500">
+            <p class="section-label mb-3">Scalp Zones <span class="normal-case font-normal text-gray-600">(±15 pts)</span></p>
+            <div class="overflow-x-auto" id="scalp-zones"></div>
+          </div>
+          <div class="card p-5 border-l-4 border-l-amber-500">
+            <p class="section-label mb-3">Main Zones <span class="normal-case font-normal text-gray-600">(±30 pts)</span></p>
+            <div class="overflow-x-auto" id="main-zones"></div>
+          </div>
+        </div>
+
+        <!-- ── Key levels + Snapshot row ── -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="card p-5 border-l-4 border-l-violet-500">
+            <p class="section-label mb-3">Key Day Levels</p>
+            <div class="overflow-x-auto" id="key-levels"></div>
+          </div>
+          <div class="card p-5">
+            <p class="section-label mb-3">Market Snapshot</p>
+            <div id="data-snapshot" class="space-y-1.5"></div>
+          </div>
+        </div>
+
+        <!-- ── AI Brief ── -->
+        <div class="card p-5">
+          <p class="section-label mb-3">AI Daily Brief</p>
+          <div id="ai-brief" class="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap"></div>
+        </div>
+
+        <!-- ── Sentiment + Themes ── -->
+        <div id="news-card" class="card p-5 hidden">
+          <div class="flex flex-wrap items-center gap-3 mb-3">
+            <p class="section-label">News Context</p>
+            <span id="sentiment-badge" class="badge"></span>
+          </div>
+          <div id="themes-list" class="flex flex-wrap gap-2"></div>
+        </div>
+
+      </div><!-- /results-panel -->
+    </div><!-- /tab-dashboard -->
+
+    <!-- ── USERS TAB ── -->
+    <div id="tab-users" class="hidden">
+      <div class="max-w-lg">
+        <h2 class="text-lg font-semibold text-white mb-1">Manage Users</h2>
+        <p class="text-sm text-gray-500 mb-6">Add or remove users who can access this dashboard.</p>
+
+        <!-- Add user form -->
+        <div class="card p-5 mb-5">
+          <p class="text-sm font-medium text-white mb-4">Add new user</p>
+          <div class="space-y-3">
+            <input id="new-email" type="email" class="inp" placeholder="Email address" />
+            <input id="new-pass"  type="password" class="inp" placeholder="Password" />
+            <div id="add-user-error" class="hidden text-red-400 text-sm"></div>
+            <button onclick="addUser()" class="btn-primary text-sm py-2">Add User</button>
+          </div>
+        </div>
+
+        <!-- User list -->
+        <div class="card">
+          <div class="px-5 py-3 border-b border-gray-800 flex items-center justify-between">
+            <p class="text-sm font-medium text-white">Current Users</p>
+            <button onclick="loadUsers()" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">Refresh</button>
+          </div>
+          <div id="user-list" class="divide-y divide-gray-800">
+            <p class="px-5 py-4 text-sm text-gray-500">Loading…</p>
+          </div>
+        </div>
+      </div>
+    </div><!-- /tab-users -->
+
+  </main>
+</div><!-- /view-app -->
+
+<script>
+// ═══════════════════════════════════════════════ STATE
+let state = { user: null, polling: null, startedAt: null, executionId: null };
+
+// ═══════════════════════════════════════════════ INIT
+async function init() {
+  try {
+    const me = await api('/auth/me');
+    setUser(me);
+    showApp();
+    // hide Users tab for non-admins
+    if (!me.isAdmin) document.getElementById('nav-users-tab').classList.add('hidden');
+    await loadLatest();
+  } catch {
+    showLogin();
+  }
+}
+
+// ═══════════════════════════════════════════════ VIEW SWITCH
+function showLogin() {
+  document.getElementById('view-login').classList.remove('hidden');
+  document.getElementById('view-app').classList.add('hidden');
+}
+function showApp() {
+  document.getElementById('view-login').classList.add('hidden');
+  document.getElementById('view-app').classList.remove('hidden', 'flex');
+  document.getElementById('view-app').classList.add('flex');
+}
+function setUser(u) {
+  state.user = u;
+  const initials = (u.email || 'U')[0].toUpperCase();
+  document.getElementById('user-avatar').textContent = initials;
+  document.getElementById('user-email-label').textContent = u.email;
+}
+
+// ═══════════════════════════════════════════════ TABS
+function showTab(name) {
+  ['dashboard','users'].forEach(t => {
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+  });
+  document.querySelectorAll('.nav-link').forEach(el => {
+    el.classList.toggle('active', el.getAttribute('onclick').includes(name));
+  });
+  if (name === 'users') loadUsers();
+}
+
+// ═══════════════════════════════════════════════ USER MENU
+function toggleUserMenu() {
+  document.getElementById('user-dropdown').classList.toggle('hidden');
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('user-menu-wrapper').contains(e.target))
+    document.getElementById('user-dropdown').classList.add('hidden');
+});
+
+// ═══════════════════════════════════════════════ AUTH
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.classList.add('hidden');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="w-4 h-4 border-2 border-white border-t-transparent rounded-full spinner"></div><span>Signing in…</span>';
+  try {
+    const email = document.getElementById('login-email').value;
+    const pass  = document.getElementById('login-pass').value;
+    const me = await api('/auth/login', { method:'POST', body:{ email, password: pass }});
+    setUser(me);
+    showApp();
+    if (!me.isAdmin) document.getElementById('nav-users-tab').classList.add('hidden');
+    else document.getElementById('nav-users-tab').classList.remove('hidden');
+    await loadLatest();
+  } catch(err) {
+    errEl.textContent = err.message || 'Login failed';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span>Sign in</span>';
+  }
+});
+
+async function logout() {
+  await api('/auth/logout', { method:'POST' }).catch(()=>{});
+  showLogin();
+}
+
+// ═══════════════════════════════════════════════ ANALYSIS
+async function runAnalysis() {
+  if (state.polling) return;
+  setRunBtn(true);
+  showPanel('loading');
+  state.startedAt = Date.now();
+  startProgressAnimation();
+  try {
+    const { executionId } = await api('/api/trigger', { method:'POST' });
+    state.executionId = executionId;
+    if (!executionId) throw new Error('No execution ID returned from n8n');
+    state.polling = setInterval(() => pollExecution(executionId), 6000);
+  } catch(err) {
+    stopPolling();
+    showError('Failed to start: ' + err.message);
+  }
+}
+
+async function pollExecution(id) {
+  try {
+    const data = await api('/api/execution/' + id);
+    if (data.status === 'success') {
+      stopPolling();
+      renderResult(data.result);
+    } else if (data.status === 'error') {
+      stopPolling();
+      showError('Execution error: ' + (data.error || 'Unknown'));
+    }
+    // 'running' or 'waiting' → keep polling
+  } catch { /* network hiccup, retry next tick */ }
+}
+
+async function loadLatest() {
+  try {
+    const data = await api('/api/latest');
+    if (data.status === 'success' && data.result) {
+      renderResult(data.result);
+    } else {
+      showPanel('empty');
+    }
+  } catch {
+    showPanel('empty');
+  }
+}
+
+function stopPolling() {
+  if (state.polling) { clearInterval(state.polling); state.polling = null; }
+  if (state._elapsedTimer) { clearInterval(state._elapsedTimer); state._elapsedTimer = null; }
+  setRunBtn(false);
+}
+
+function setRunBtn(running) {
+  const btn = document.getElementById('run-btn');
+  const icon = document.getElementById('run-icon');
+  const label = document.getElementById('run-label');
+  btn.disabled = running;
+  if (running) {
+    icon.outerHTML = '<div id="run-icon" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full spinner"></div>';
+    label.textContent = 'Running…';
+  } else {
+    label.textContent = 'Run Analysis';
+    const newIcon = document.createElement('div');
+    newIcon.id = 'run-icon';
+    newIcon.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
+    const old = document.getElementById('run-icon');
+    if (old) old.replaceWith(newIcon.firstElementChild);
+  }
+}
+
+// ═══════════════════════════════════════════════ PROGRESS ANIMATION
+const STEPS_DEF = [
+  { label:'Fetching chart analysis…', pct: 15, time: 20 },
+  { label:'Fetching market data…',    pct: 35, time: 40 },
+  { label:'Fetching news…',           pct: 55, time: 70 },
+  { label:'Running AI synthesis…',    pct: 75, time: 110 },
+  { label:'Building report…',         pct: 90, time: 150 },
+];
+
+function startProgressAnimation() {
+  let seconds = 0;
+  const bar    = document.getElementById('loading-bar');
+  const step   = document.getElementById('loading-step');
+  const elapsed = document.getElementById('loading-elapsed');
+  const dots   = document.querySelectorAll('.step-dot');
+  // reset
+  bar.style.width = '5%';
+  dots.forEach((d,i) => { d.parentElement.classList.toggle('bg-white/3', i===0); d.classList.remove('bg-blue-500','border-blue-500','text-white'); });
+
+  state._elapsedTimer = setInterval(() => {
+    seconds++;
+    elapsed.textContent = seconds < 60 ? seconds + 's' : Math.floor(seconds/60) + 'm ' + (seconds%60) + 's';
+    const active = STEPS_DEF.findLast(s => seconds >= s.time) || STEPS_DEF[0];
+    bar.style.width = active.pct + '%';
+    step.textContent = active.label;
+    const idx = STEPS_DEF.indexOf(active);
+    dots.forEach((d, i) => {
+      const li = d.parentElement;
+      li.classList.toggle('bg-white/3', i === idx);
+      d.classList.toggle('bg-blue-500',   i < idx);
+      d.classList.toggle('border-blue-500', i < idx);
+      d.classList.toggle('text-white', i < idx);
+    });
+  }, 1000);
+}
+
+// ═══════════════════════════════════════════════ PANELS
+function showPanel(name) {
+  document.getElementById('loading-panel').classList.toggle('hidden', name !== 'loading');
+  document.getElementById('empty-panel').classList.toggle('hidden',   name !== 'empty');
+  document.getElementById('results-panel').classList.toggle('hidden', name !== 'results');
+}
+
+function showError(msg) {
+  setRunBtn(false);
+  showPanel('empty');
+  document.querySelector('#empty-panel h3').textContent = 'Something went wrong';
+  document.querySelector('#empty-panel p').textContent = msg;
+}
+
+// ═══════════════════════════════════════════════ RENDER RESULT
+function renderResult(r) {
+  if (!r) return;
+  stopPolling();
+
+  // Nav symbol + time
+  document.getElementById('nav-symbol').classList.remove('hidden');
+  document.getElementById('nav-symbol').classList.add('flex');
+  document.getElementById('nav-symbol-text').textContent = r.symbol || 'NQ=F';
+  if (r.ranAt) {
+    const d = new Date(r.ranAt);
+    document.getElementById('nav-ran-at').textContent =
+      d.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }) + ' · ' +
+      d.toLocaleDateString([], { month:'short', day:'numeric' });
+  }
+
+  // ── Price strip
+  const strip = document.getElementById('price-strip');
+  strip.innerHTML = '';
+  const prices = r.prices || [];
+  const pp = r.pp;
+  document.getElementById('price-count').textContent = prices.length + ' levels';
+
+  prices.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'price-pill ' + (i === 0 ? 'pill-pp' : p > pp ? 'pill-res' : 'pill-sup');
+    el.innerHTML = `<span class="pill-label">${i === 0 ? 'PP' : p > pp ? '▲' : '▼'}</span>${p.toLocaleString()}`;
+    strip.appendChild(el);
+  });
+
+  // ── Bias
+  const biasTxt = (r.biasMd || '').trim();
+  if (biasTxt) {
+    document.getElementById('bias-content').textContent = biasTxt;
+    document.getElementById('bias-card').classList.remove('hidden');
+  } else {
+    document.getElementById('bias-card').classList.add('hidden');
+  }
+
+  // ── Tables
+  document.getElementById('scalp-zones').innerHTML = renderMdTable(r.scalpZonesMd);
+  document.getElementById('main-zones').innerHTML  = renderMdTable(r.mainZonesMd);
+  document.getElementById('key-levels').innerHTML  = renderMdTable(r.keyLevelsMd);
+
+  // ── Data snapshot
+  const snap = document.getElementById('data-snapshot');
+  snap.innerHTML = '';
+  (r.dataSnapshotMd || '').split('\n').filter(l => l.includes('**')).forEach(line => {
+    const [key, ...rest] = line.replace(/\*\*/g,'').split(':');
+    if (!key) return;
+    const row = document.createElement('div');
+    row.className = 'flex justify-between items-center py-1 border-b border-gray-800/60 last:border-0';
+    row.innerHTML = `<span class="text-xs text-gray-400">${esc(key.trim())}</span><span class="text-xs font-mono text-gray-200">${esc(rest.join(':').trim())}</span>`;
+    snap.appendChild(row);
+  });
+
+  // ── AI Brief
+  document.getElementById('ai-brief').textContent = r.chartSummary || '';
+
+  // ── News / Sentiment
+  const themes    = r.themes || [];
+  const sentiment = r.sentiment;
+  if (themes.length || sentiment !== null) {
+    document.getElementById('news-card').classList.remove('hidden');
+    const sb = document.getElementById('sentiment-badge');
+    if (sentiment !== null) {
+      const s = String(sentiment).toLowerCase();
+      const cfg = s.includes('bull') ? ['Bullish','bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'] :
+                  s.includes('bear') ? ['Bearish','bg-red-500/20 text-red-300 border border-red-500/30'] :
+                                       ['Neutral','bg-gray-500/20 text-gray-300 border border-gray-500/30'];
+      sb.textContent = cfg[0];
+      sb.className = 'badge ' + cfg[1];
+    }
+    const tl = document.getElementById('themes-list');
+    tl.innerHTML = '';
+    themes.slice(0, 12).forEach(t => {
+      const chip = document.createElement('span');
+      chip.className = 'text-xs px-2.5 py-1 rounded-full border border-gray-700 text-gray-300 bg-white/3';
+      chip.textContent = t;
+      tl.appendChild(chip);
+    });
+  }
+
+  showPanel('results');
+}
+
+// ═══════════════════════════════════════════════ MARKDOWN TABLE → HTML
+function renderMdTable(md) {
+  if (!md || !md.trim()) return '<p class="text-xs text-gray-600 py-2">No data</p>';
+  const lines = md.split('\n').filter(l => {
+    const t = l.trim();
+    return t.startsWith('|') && t.endsWith('|');
+  });
+  if (lines.length < 2) return `<pre class="text-xs text-gray-400 whitespace-pre-wrap">${esc(md)}</pre>`;
+
+  const isSep = l => /^\|\s*[-:| ]+\|\s*$/.test(l.trim());
+  const dataLines = lines.filter(l => !isSep(l));
+  if (!dataLines.length) return '';
+
+  const cells = l => l.split('|').slice(1, -1).map(c => c.trim());
+  const [hdr, ...rows] = dataLines;
+  const th = cells(hdr).map(c => `<th>${esc(c)}</th>`).join('');
+  const trs = rows.map(row => {
+    const tds = cells(row).map(c => `<td>${esc(c)}</td>`).join('');
+    return `<tr>${tds}</tr>`;
+  }).join('');
+  return `<table class="data-table"><thead><tr>${th}</tr></thead><tbody>${trs}</tbody></table>`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ═══════════════════════════════════════════════ USER MANAGEMENT
+async function loadUsers() {
+  const list = document.getElementById('user-list');
+  try {
+    const users = await api('/admin/users');
+    if (!users.length) { list.innerHTML = '<p class="px-5 py-4 text-sm text-gray-500">No users found.</p>'; return; }
+    list.innerHTML = users.map(u => `
+      <div class="px-5 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
+               style="background: linear-gradient(135deg,#2563eb,#7c3aed);">${esc(u.email[0].toUpperCase())}</div>
+          <span class="text-sm text-gray-200">${esc(u.email)}</span>
+          ${u.isAdmin ? '<span class="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">admin</span>' : ''}
+        </div>
+        ${!u.isAdmin ? `<button onclick="removeUser('${esc(u.email)}')" class="text-xs text-red-400 hover:text-red-300 transition-colors">Remove</button>` : ''}
+      </div>
+    `).join('');
+  } catch(err) {
+    list.innerHTML = `<p class="px-5 py-4 text-sm text-red-400">${esc(err.message)}</p>`;
+  }
+}
+
+async function addUser() {
+  const email = document.getElementById('new-email').value.trim();
+  const pass  = document.getElementById('new-pass').value;
+  const errEl = document.getElementById('add-user-error');
+  errEl.classList.add('hidden');
+  if (!email || !pass) { errEl.textContent = 'Email and password required'; errEl.classList.remove('hidden'); return; }
+  try {
+    await api('/admin/users', { method:'POST', body:{ email, password: pass }});
+    document.getElementById('new-email').value = '';
+    document.getElementById('new-pass').value  = '';
+    await loadUsers();
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function removeUser(email) {
+  if (!confirm(`Remove ${email}?`)) return;
+  try {
+    await api('/admin/users/' + encodeURIComponent(email), { method:'DELETE' });
+    await loadUsers();
+  } catch(err) {
+    alert(err.message);
+  }
+}
+
+// ═══════════════════════════════════════════════ API HELPER
+async function api(url, opts = {}) {
+  const res = await fetch(url, {
+    method: opts.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    credentials: 'same-origin'
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// ═══════════════════════════════════════════════ START
+init();
+</script>
+</body>
+</html>
