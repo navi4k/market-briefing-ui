@@ -222,11 +222,16 @@ app.get('/api/latest', requireAuth, async (req, res) => {
     res.json({ status: 'none' });
 
   } catch (e) {
-    // n8n API unreachable — use local trigger timestamp + cache to infer state
-    if (triggered && !isFresh()) {
-      // We triggered but cache hasn't updated yet → still running
+    // n8n API unreachable — use trigger timestamp + cache to infer state
+    const elapsedMs = triggered ? Date.now() - new Date(triggered.triggeredAt).getTime() : Infinity;
+    const MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes — workflow must be done by then
+
+    if (elapsedMs < MAX_WAIT_MS && triggered && !isFresh()) {
+      // Still within expected run time and no fresh cache yet → still running
       return res.json({ status: 'running' });
     }
+
+    // Either timed out or cache is fresh enough — serve what we have
     if (cached) return res.json({ status: 'success', result: cached });
     res.status(500).json({ error: e.message });
   }

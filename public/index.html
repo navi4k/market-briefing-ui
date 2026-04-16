@@ -206,12 +206,15 @@
       <!-- Loading / progress overlay -->
       <div id="loading-panel" class="hidden card p-8 mb-6 fade-in">
         <div class="flex items-center gap-4 mb-6">
-          <div class="w-10 h-10 rounded-full border-2 border-blue-500 border-t-transparent spinner"></div>
-          <div>
+          <div class="w-10 h-10 rounded-full border-2 border-blue-500 border-t-transparent spinner flex-shrink-0"></div>
+          <div class="min-w-0">
             <p class="font-semibold text-white" id="loading-title">Running Analysis</p>
             <p class="text-sm text-gray-400" id="loading-step">Initializing…</p>
           </div>
-          <div class="ml-auto text-xs text-gray-500 font-mono" id="loading-elapsed">0s</div>
+          <div class="ml-auto flex items-center gap-3 flex-shrink-0">
+            <span class="text-xs text-gray-500 font-mono" id="loading-elapsed">0s</span>
+            <button onclick="cancelAnalysis()" class="text-xs text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 rounded px-2.5 py-1 transition-colors">Cancel</button>
+          </div>
         </div>
         <div class="bg-gray-800 rounded-full overflow-hidden" style="height:3px;">
           <div class="progress-bar" id="loading-bar" style="width:5%;"></div>
@@ -444,15 +447,21 @@ async function runAnalysis() {
 
 async function pollLatest() {
   try {
+    const elapsed = Date.now() - state.startedAt;
+    // Hard stop after 6 minutes — workflow is definitely done by then
+    if (elapsed > 6 * 60 * 1000) {
+      stopPolling();
+      // Load whatever is cached
+      const data = await api('/api/latest');
+      if (data.result) renderResult(data.result);
+      else showError('Workflow timed out — no result available. Check your email for the briefing.');
+      return;
+    }
+
     const data = await api('/api/latest');
     if (data.status === 'success' && data.result) {
-      // Check if this result is newer than when we triggered
-      const ranAt = data.result.ranAt ? new Date(data.result.ranAt).getTime() : 0;
-      if (ranAt >= state.startedAt - 5000) {
-        stopPolling();
-        renderResult(data.result);
-      }
-      // else it's an older cached result — keep waiting
+      stopPolling();
+      renderResult(data.result);
     } else if (data.status === 'error') {
       stopPolling();
       showError('Execution error: ' + (data.error || 'Unknown'));
@@ -478,6 +487,16 @@ function stopPolling() {
   if (state.polling) { clearInterval(state.polling); state.polling = null; }
   if (state._elapsedTimer) { clearInterval(state._elapsedTimer); state._elapsedTimer = null; }
   setRunBtn(false);
+}
+
+async function cancelAnalysis() {
+  stopPolling();
+  // Try to show the last cached result; fall back to empty panel
+  try {
+    const data = await api('/api/latest');
+    if (data.result) { renderResult(data.result); return; }
+  } catch {}
+  showPanel('empty');
 }
 
 function setRunBtn(running) {
