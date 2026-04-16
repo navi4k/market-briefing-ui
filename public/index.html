@@ -178,7 +178,7 @@
       <!-- Right: run + user -->
       <div class="flex items-center gap-2">
         <button id="run-btn" onclick="runAnalysis()" class="btn-primary py-1.5 px-3 text-xs">
-          <svg id="run-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span id="run-icon-wrap"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span>
           <span id="run-label">Run Analysis</span>
         </button>
         <div class="relative" id="user-menu-wrapper">
@@ -491,30 +491,22 @@ function stopPolling() {
 
 async function cancelAnalysis() {
   stopPolling();
-  // Try to show the last cached result; fall back to empty panel
+  showPanel('empty');  // reset UI immediately
   try {
     const data = await api('/api/latest');
-    if (data.result) { renderResult(data.result); return; }
+    if (data.result && !state.polling) renderResult(data.result); // don't clobber a new run
   } catch {}
-  showPanel('empty');
 }
 
 function setRunBtn(running) {
-  const btn = document.getElementById('run-btn');
-  const icon = document.getElementById('run-icon');
+  const btn  = document.getElementById('run-btn');
+  const wrap = document.getElementById('run-icon-wrap');
   const label = document.getElementById('run-label');
   btn.disabled = running;
-  if (running) {
-    icon.outerHTML = '<div id="run-icon" class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full spinner"></div>';
-    label.textContent = 'Running…';
-  } else {
-    label.textContent = 'Run Analysis';
-    const newIcon = document.createElement('div');
-    newIcon.id = 'run-icon';
-    newIcon.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`;
-    const old = document.getElementById('run-icon');
-    if (old) old.replaceWith(newIcon.firstElementChild);
-  }
+  label.textContent = running ? 'Running…' : 'Run Analysis';
+  wrap.innerHTML = running
+    ? '<div class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full spinner"></div>'
+    : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
 }
 
 // ═══════════════════════════════════════════════ PROGRESS ANIMATION

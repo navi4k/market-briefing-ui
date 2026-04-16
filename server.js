@@ -113,7 +113,11 @@ app.delete('/admin/users/:email', requireAdmin, (req, res) => {
 
 // ─── n8n helper ───────────────────────────────────────────────────────────────
 async function n8nFetch(endpoint, opts = {}) {
-  const resp = await fetch(`${N8N_URL}/api/v1${endpoint}`, {
+  if (!N8N_KEY) throw new Error('N8N_KEY not configured — check .env');
+  // Pass key as both header AND query param (query param survives redirects that strip headers)
+  const sep = endpoint.includes('?') ? '&' : '?';
+  const url = `${N8N_URL}/api/v1${endpoint}${sep}apiKey=${encodeURIComponent(N8N_KEY)}`;
+  const resp = await fetch(url, {
     ...opts,
     headers: { 'X-N8N-API-KEY': N8N_KEY, 'Content-Type': 'application/json', ...(opts.headers || {}) }
   });
