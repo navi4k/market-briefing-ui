@@ -448,7 +448,7 @@ async function runAnalysis() {
 async function pollLatest() {
   // Timeout check is OUTSIDE try-catch so it always fires
   const elapsed = Date.now() - state.startedAt;
-  if (elapsed > 6 * 60 * 1000) {
+  if (elapsed > 4 * 60 * 1000) {
     stopPolling();
     try {
       const data = await api('/api/latest');
