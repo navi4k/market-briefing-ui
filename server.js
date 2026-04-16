@@ -10,8 +10,9 @@ const PORT        = process.env.PORT || 3456;
 const N8N_URL     = process.env.N8N_URL || 'https://n8n.effipm.cloud';
 const N8N_KEY     = process.env.N8N_KEY || '';
 const WORKFLOW_ID = process.env.N8N_WORKFLOW_ID || 'TCTwgK1Apdy4oULj';
-const USERS_FILE  = path.join(__dirname, 'users.json');
-const CACHE_FILE  = path.join(__dirname, 'last_result.json');
+const USERS_FILE    = path.join(__dirname, 'users.json');
+const CACHE_FILE    = path.join(__dirname, 'last_result.json');
+const TRIGGER_FILE  = path.join(__dirname, 'last_trigger.json');
 
 // Startup config check
 if (!N8N_KEY) console.warn('[warn] N8N_KEY is not set — n8n API calls will fail with 401');
@@ -38,6 +39,14 @@ function saveCache(result) {
 }
 function loadCache() {
   try { return JSON.parse(fs.readFileSync(CACHE_FILE, 'utf8')); } catch { return null; }
+}
+
+// ─── Trigger timestamp ────────────────────────────────────────────────────────
+function saveTrigger() {
+  try { fs.writeFileSync(TRIGGER_FILE, JSON.stringify({ triggeredAt: new Date().toISOString() })); } catch {}
+}
+function loadTrigger() {
+  try { return JSON.parse(fs.readFileSync(TRIGGER_FILE, 'utf8')); } catch { return null; }
 }
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
@@ -159,7 +168,6 @@ function extractResult(exec) {
 // ─── API routes ───────────────────────────────────────────────────────────────
 app.post('/api/trigger', requireAuth, async (req, res) => {
   try {
-    // Call the webhook trigger on the n8n workflow
     const resp = await fetch(`${N8N_URL}/webhook/market-briefing-trigger`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -169,11 +177,9 @@ app.post('/api/trigger', requireAuth, async (req, res) => {
       const txt = await resp.text();
       throw new Error(`Webhook ${resp.status}: ${txt.slice(0, 200)}`);
     }
-    // Webhook fires async — grab the latest execution ID from n8n
-    await new Promise(r => setTimeout(r, 1500)); // brief wait for n8n to register
-    const execs = await n8nFetch(`/executions?workflowId=${WORKFLOW_ID}&limit=1`);
-    const executionId = execs?.data?.[0]?.id ?? null;
-    res.json({ executionId });
+    // Record when we triggered so /api/latest can detect a fresh run
+    saveTrigger();
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -188,25 +194,39 @@ app.get('/api/execution/:id', requireAuth, async (req, res) => {
 });
 
 app.get('/api/latest', requireAuth, async (req, res) => {
-  try {
-    // Return cached result immediately while checking n8n for fresher data
-    const cached = loadCache();
+  const cached    = loadCache();
+  const triggered = loadTrigger();
 
-    // Try to get latest from n8n
+  // Helper: is the cached result newer than the last trigger?
+  function isFresh() {
+    if (!triggered || !cached?.ranAt) return false;
+    return new Date(cached.ranAt) >= new Date(triggered.triggeredAt);
+  }
+
+  try {
+    // Try to get live data from n8n
     const data = await n8nFetch(`/executions?workflowId=${WORKFLOW_ID}&limit=1&includeData=true`);
     const exec = data?.data?.[0];
 
     if (exec?.status === 'success') {
-      const result = extractResult(exec);
-      return res.json({ status: 'success', id: exec.id, result });
+      const result = extractResult(exec);   // also saves to cache
+      return res.json({ status: 'success', result });
     }
 
-    // Fall back to disk cache
+    if (exec?.status === 'running' || exec?.status === 'new') {
+      return res.json({ status: 'running' });
+    }
+
+    // n8n gave us an exec but it wasn't success — fall back to cache
     if (cached) return res.json({ status: 'success', result: cached });
     res.json({ status: 'none' });
+
   } catch (e) {
-    // n8n unreachable — serve from cache if available
-    const cached = loadCache();
+    // n8n API unreachable — use local trigger timestamp + cache to infer state
+    if (triggered && !isFresh()) {
+      // We triggered but cache hasn't updated yet → still running
+      return res.json({ status: 'running' });
+    }
     if (cached) return res.json({ status: 'success', result: cached });
     res.status(500).json({ error: e.message });
   }

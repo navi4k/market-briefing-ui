@@ -433,27 +433,31 @@ async function runAnalysis() {
   state.startedAt = Date.now();
   startProgressAnimation();
   try {
-    const { executionId } = await api('/api/trigger', { method:'POST' });
-    state.executionId = executionId;
-    if (!executionId) throw new Error('No execution ID returned from n8n');
-    state.polling = setInterval(() => pollExecution(executionId), 6000);
+    await api('/api/trigger', { method:'POST' });
+    // Webhook fired — poll /api/latest until we get a fresh result
+    state.polling = setInterval(pollLatest, 8000);
   } catch(err) {
     stopPolling();
     showError('Failed to start: ' + err.message);
   }
 }
 
-async function pollExecution(id) {
+async function pollLatest() {
   try {
-    const data = await api('/api/execution/' + id);
-    if (data.status === 'success') {
-      stopPolling();
-      renderResult(data.result);
+    const data = await api('/api/latest');
+    if (data.status === 'success' && data.result) {
+      // Check if this result is newer than when we triggered
+      const ranAt = data.result.ranAt ? new Date(data.result.ranAt).getTime() : 0;
+      if (ranAt >= state.startedAt - 5000) {
+        stopPolling();
+        renderResult(data.result);
+      }
+      // else it's an older cached result — keep waiting
     } else if (data.status === 'error') {
       stopPolling();
       showError('Execution error: ' + (data.error || 'Unknown'));
     }
-    // 'running' or 'waiting' → keep polling
+    // 'running' or 'none' → keep polling
   } catch { /* network hiccup, retry next tick */ }
 }
 
