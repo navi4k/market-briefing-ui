@@ -154,8 +154,20 @@ function extractResult(exec) {
 // ─── API routes ───────────────────────────────────────────────────────────────
 app.post('/api/trigger', requireAuth, async (req, res) => {
   try {
-    const data = await n8nFetch(`/workflows/${WORKFLOW_ID}/execute`, { method: 'POST', body: '{}' });
-    const executionId = data?.data?.executionId ?? data?.executionId ?? null;
+    // Call the webhook trigger on the n8n workflow
+    const resp = await fetch(`${N8N_URL}/webhook/market-briefing-trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    if (!resp.ok) {
+      const txt = await resp.text();
+      throw new Error(`Webhook ${resp.status}: ${txt.slice(0, 200)}`);
+    }
+    // Webhook fires async — grab the latest execution ID from n8n
+    await new Promise(r => setTimeout(r, 1500)); // brief wait for n8n to register
+    const execs = await n8nFetch(`/executions?workflowId=${WORKFLOW_ID}&limit=1`);
+    const executionId = execs?.data?.[0]?.id ?? null;
     res.json({ executionId });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
