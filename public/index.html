@@ -446,18 +446,19 @@ async function runAnalysis() {
 }
 
 async function pollLatest() {
-  try {
-    const elapsed = Date.now() - state.startedAt;
-    // Hard stop after 6 minutes — workflow is definitely done by then
-    if (elapsed > 6 * 60 * 1000) {
-      stopPolling();
-      // Load whatever is cached
+  // Timeout check is OUTSIDE try-catch so it always fires
+  const elapsed = Date.now() - state.startedAt;
+  if (elapsed > 6 * 60 * 1000) {
+    stopPolling();
+    try {
       const data = await api('/api/latest');
-      if (data.result) renderResult(data.result);
-      else showError('Workflow timed out — no result available. Check your email for the briefing.');
-      return;
-    }
+      if (data.result) { renderResult(data.result); return; }
+    } catch {}
+    showError('Workflow is taking longer than expected. Your briefing was emailed. Click Refresh to check for results.');
+    return;
+  }
 
+  try {
     const data = await api('/api/latest');
     if (data.status === 'success' && data.result) {
       stopPolling();

@@ -170,6 +170,57 @@ function extractResult(exec) {
 }
 
 // ─── API routes ───────────────────────────────────────────────────────────────
+
+// n8n workflow pushes its result here when done — bypasses API key entirely
+app.post('/api/result', (req, res) => {
+  const body = req.body;
+  if (!body || typeof body !== 'object') return res.status(400).json({ error: 'Invalid body' });
+  const result = {
+    symbol:         body.symbol         || 'NQ=F',
+    chartSummary:   body.chartSummary   || '',
+    mainZonesMd:    body.mainZonesMd    || '',
+    scalpZonesMd:   body.scalpZonesMd   || '',
+    keyLevelsMd:    body.keyLevelsMd    || '',
+    dataSnapshotMd: body.dataSnapshotMd || '',
+    biasMd:         body.biasMd         || '',
+    prices:         Array.isArray(body.prices) ? body.prices : [],
+    pp:             body.pp             ?? null,
+    sentiment:      body.sentiment      ?? null,
+    themes:         Array.isArray(body.themes) ? body.themes : [],
+    subject:        body.subject        || '',
+    ranAt:          body.ranAt          || new Date().toISOString(),
+  };
+  saveCache(result);
+  console.log('[result] Received pushed result from n8n, saved to cache');
+  res.json({ ok: true });
+});
+
+// Diagnostic endpoint — visit /api/debug in browser to check n8n connectivity
+app.get('/api/debug', async (req, res) => {
+  const triggered = loadTrigger();
+  const cached    = loadCache();
+  const info = {
+    n8nUrl:       N8N_URL,
+    workflowId:   WORKFLOW_ID,
+    keyPresent:   !!N8N_KEY,
+    keyPreview:   N8N_KEY ? N8N_KEY.slice(0, 20) + '...' : 'MISSING',
+    cacheExists:  !!cached,
+    cacheRanAt:   cached?.ranAt || null,
+    lastTrigger:  triggered?.triggeredAt || null,
+  };
+  try {
+    const data = await n8nFetch(`/executions?workflowId=${WORKFLOW_ID}&limit=1`);
+    info.n8nApiStatus = 'ok';
+    info.latestExec   = data?.data?.[0]
+      ? { id: data.data[0].id, status: data.data[0].status, startedAt: data.data[0].startedAt }
+      : null;
+  } catch(e) {
+    info.n8nApiStatus = 'error';
+    info.n8nApiError  = e.message;
+  }
+  res.json(info);
+});
+
 app.post('/api/trigger', requireAuth, async (req, res) => {
   try {
     const resp = await fetch(`${N8N_URL}/webhook/market-briefing-trigger`, {
@@ -237,7 +288,7 @@ app.get('/api/latest', requireAuth, async (req, res) => {
 
     // Either timed out or cache is fresh enough — serve what we have
     if (cached) return res.json({ status: 'success', result: cached });
-    res.status(500).json({ error: e.message });
+    res.json({ status: 'none' });  // never return 500 — UI can't recover from it
   }
 });
 
